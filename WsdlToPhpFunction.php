@@ -55,10 +55,9 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	 * @uses WsdlToPhpModel::getDocumentation()
 	 * @uses WsdlToPhpModel::getGenericWsdlClassName()
 	 * @uses WsdlToPhpModel::cleanString()
-	 * @param int $_part comment part
 	 * @return array
 	 */
-	public function getComment($_part = '')
+	public function getComment()
 	{
 		$comments = array();
 		array_push($comments,'Method to call the operation originally named ' . $this->getName());
@@ -122,9 +121,9 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	 * @uses WsdlToPhpModel::nameIsClean()
 	 * @uses WsdlToPhpModel::cleanString()
 	 * @uses WsdlToPhpModel::uniqueName()
-	 * @uses WsdlToPhpModel::getOwner()
 	 * @uses WsdlToPhpModel::replaceReservedPhpKeyword()
 	 * @uses WsdlToPhpFunction::getParameterType()
+	 * @uses WsdlToPhpFunction::getOwner()
 	 * @uses WsdlToPhpStruct::getAttributes()
 	 * @uses WsdlToPhpStruct::getIsStruct()
 	 * @uses WsdlToPhpStructAttribute::getGetterName()
@@ -286,6 +285,16 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	public function setReturnType($_returnType)
 	{
 		return ($this->returnType = $_returnType);
+	}
+	/**
+	 * Returns the owner model object, meaning a WsdlToPhpService object
+	 * @see WsdlToPhpModel::getOwner()
+	 * @uses WsdlToPhpModel::getOwner()
+	 * @return WsdlToPhpService
+	 */
+	public function getOwner()
+	{
+		return parent::getOwner();
 	}
 	/**
 	 * Return class name

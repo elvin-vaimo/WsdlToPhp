@@ -282,6 +282,11 @@
  * <li>{@link http://demo.magentocommerce.com/api/v2_soap?wsdl=1}, ex: login operation</li>
  * </ul>
  * </li>
+ * <li>Web Service with all parameter only detected with unknown parameter type and return per operation. These types must be retrieved from the WSDLs
+ * <ul>
+ * <li>{@link http://196.29.140.10:9091/services/MyBoardPack.Soap.svc?singleWsdl}</li>
+ * </ul>
+ * </li>
  * </ul>
  * @package WsdlToPhpGenerator
  * @date 19/12/2012
@@ -421,6 +426,12 @@ class WsdlToPhpGenerator extends SoapClient
 	 */
 	const OPT_ADD_COMMENTS = 'option_add_comments_key';
 	/**
+	 * Index to enable/disable debug mode.
+	 * Debug only display each call to the audit method to follow the calls and treatments
+	 * @var string
+	 */
+	const OPT_DEBUG = 'option_debug';
+	/**
 	 * Structs array
 	 * @var array
 	 */
@@ -501,12 +512,23 @@ class WsdlToPhpGenerator extends SoapClient
 	 */
 	private static $optionAddComments;
 	/**
+	 * Option to set debug
+	 * @var bool
+	 */
+	private static $optionDebug;
+	/**
+	 * Use intern global variable instead of using the PHP $GLOBALS variable
+	 * @var array
+	 */
+	private static $globals;
+	/**
 	 * Constructor
 	 * @uses SoapClient::__construct()
 	 * @uses WsdlToPhpGenerator::setStructs()
 	 * @uses WsdlToPhpGenerator::setServices()
 	 * @uses WsdlToPhpGenerator::setWsdls()
 	 * @uses WsdlToPhpGenerator::addWsdl()
+	 * @uses WsdlToPhpGenerator::setOptionDebug()
 	 * @uses WsdlToPhpGenerator::setOptionCategory()
 	 * @uses WsdlToPhpGenerator::setOptionGenerateAutoloadFile()
 	 * @uses WsdlToPhpGenerator::setOptionGenerateTutorialFile()
@@ -519,6 +541,7 @@ class WsdlToPhpGenerator extends SoapClient
 	 * @uses WsdlToPhpGenerator::setOptionGenericConstantsNames()
 	 * @uses WsdlToPhpGenerator::setOptionInheritsClassIdentifier()
 	 * @uses WsdlToPhpGenerator::setOptionSendParametersAsArray()
+	 * @uses WsdlToPhpGenerator::OPT_DEBUG
 	 * @uses WsdlToPhpGenerator::OPT_CAT_KEY
 	 * @uses WsdlToPhpGenerator::OPT_CAT_START_NAME
 	 * @uses WsdlToPhpGenerator::OPT_GEN_AUTOLOAD_KEY
@@ -584,6 +607,7 @@ class WsdlToPhpGenerator extends SoapClient
 		/**
 		 * Sets attributes
 		 */
+		self::setOptionDebug(array_key_exists(self::OPT_DEBUG,$_options)?$_options[self::OPT_DEBUG]:false);
 		self::setOptionCategory(array_key_exists(self::OPT_CAT_KEY,$_options)?$_options[self::OPT_CAT_KEY]:self::OPT_CAT_START_NAME);
 		self::setOptionGenerateAutoloadFile(array_key_exists(self::OPT_GEN_AUTOLOAD_KEY,$_options)?$_options[self::OPT_GEN_AUTOLOAD_KEY]:false);
 		self::setOptionGenerateTutorialFile(array_key_exists(self::OPT_GEN_TUTORIAL_KEY,$_options)?$_options[self::OPT_GEN_TUTORIAL_KEY]:false);
@@ -717,7 +741,6 @@ class WsdlToPhpGenerator extends SoapClient
 		if(is_array($types) && count($types))
 		{
 			$structsDefined = array();
-			$structsParams = array();
 			foreach($types as $type)
 			{
 				$typeSignature = md5($type);
@@ -1032,37 +1055,40 @@ class WsdlToPhpGenerator extends SoapClient
 	private static function populateFile($_fileName,array $_declarations)
 	{
 		self::auditInit('populate');
-		$php = new ezcPhpGenerator($_fileName,true,true);
-		$php->indentString = "\t";
+		$content = array(
+						'<?php');
+		$indentationString = "\t";
+		$indentationLevel = 0;
 		foreach($_declarations as $line=>$declaration)
 		{
 			if(is_array($declaration) && array_key_exists('comment',$declaration) && is_array($declaration['comment']))
 			{
-				$php->appendCustomCode("/**");
+				array_push($content,str_repeat($indentationString,$indentationLevel) . '/**');
 				foreach($declaration['comment'] as $subLine=>$subComment)
-					$php->appendCustomCode(" * " . WsdlToPhpModel::cleanComment($subComment));
-				$php->appendCustomCode(" */");
+					array_push($content,str_repeat($indentationString,$indentationLevel) . ' * ' . WsdlToPhpModel::cleanComment($subComment));
+				array_push($content,str_repeat($indentationString,$indentationLevel) . ' */');
 			}
 			elseif(is_string($declaration))
 			{
 				switch($declaration)
 				{
 					case '{':
-						$php->appendCustomCode($declaration);
-						$php->indentLevel++;
+						array_push($content,str_repeat($indentationString,$indentationLevel) . $declaration);
+						$indentationLevel++;
 						break;
 					case '}':
-						$php->indentLevel--;
-						$php->appendCustomCode($declaration);
+						$indentationLevel--;
+						array_push($content,str_repeat($indentationString,$indentationLevel) . $declaration);
 						break;
 					default:
-						$php->appendCustomCode($declaration);
+						array_push($content,str_repeat($indentationString,$indentationLevel) . $declaration);
 						break;
 				}
 			}
 		}
-		$php->finish();
-		self::audit('populate');
+		array_push($content,str_repeat($indentationString,$indentationLevel) . '?>');
+		file_put_contents($_fileName,implode("\r\n",$content));
+		self::audit('populate',$_fileName);
 	}
 	/**
 	 * Generates classMap class
@@ -1983,6 +2009,23 @@ class WsdlToPhpGenerator extends SoapClient
 		return (self::$optionAddComments = $_optionAddComments);
 	}
 	/**
+	 * Gets the debug mode value
+	 * @return bool
+	 */
+	public static function getOptionDebug()
+	{
+		return self::$optionDebug;
+	}
+	/**
+	 * Sts the debug mode
+	 * @param bool $_optionDebug
+	 * @return bool
+	 */
+	public static function setOptionDebug($_optionDebug = false)
+	{
+		return (self::$optionDebug = $_optionDebug);
+	}
+	/**
 	 * Gets the package name
 	 * @param bool $_ucFirst ucfirst package name or not
 	 * @return string
@@ -2281,8 +2324,6 @@ class WsdlToPhpGenerator extends SoapClient
 		{
 			$locationsToParse = array();
 			array_push($locationsToParse,!empty($_wsdlLocation)?$_wsdlLocation:$_fromWsdlLocation);
-			if($_domNode->hasAttribute('namespace') && strpos($_domNode->getAttribute('namespace'),'://'))
-				array_push($locationsToParse,$_domNode->getAttribute('namespace'));
 			foreach($locationsToParse as $locationToParse)
 			{
 				$fileParts = pathinfo($locationToParse);
@@ -2313,7 +2354,7 @@ class WsdlToPhpGenerator extends SoapClient
 				 */
 				elseif(empty($scheme) && empty($host) && count($pathParts))
 				{
-					$localPath = str_replace('//','/','/' . implode('/',$pathParts) . '/');
+					$localPath = str_replace('//','/',implode('/',$pathParts) . '/');
 					$localFile = $localPath . implode('/',$cleanLocation);
 					if(is_file($localFile))
 						array_push($locations,$localFile);
@@ -3036,7 +3077,7 @@ class WsdlToPhpGenerator extends SoapClient
 					elseif(is_array($operationParameterReturnType))
 					{
 						foreach($operationParameterReturnType as $parameterType)
-							$operationParameterReturnTypeKnown &= (!empty($parameterType) && !strtolower($parameterType) === 'unknown');
+							$operationParameterReturnTypeKnown &= (!empty($parameterType) && !(strtolower($parameterType) === 'unknown'));
 						$operationParameterReturnTypeFound = array();
 					}
 					/**
@@ -3113,6 +3154,20 @@ class WsdlToPhpGenerator extends SoapClient
 																	if(count($operationParameterReturnTypeFound) == count($operationParameterReturnType))
 																		$operationParameterReturnTypeDefined = true;
 																}
+															}
+														}
+														else
+														{
+															$nodeIndex = 0;
+															while(!$operationParameterReturnTypeDefined && $nodeIndex < $nodesLength)
+															{
+																$node = $nodes->item($nodeIndex);
+																if($node && !empty($node->nodeName) && $node->getAttribute('name') == $partElement && (stripos($node->nodeName,'element') !== false || stripos($node->nodeName,'complexType') !== false || stripos($node->nodeName,'simpleType') !== false))
+																{
+																	$operationParameterReturnTypeFound = $node->getAttribute('name');
+																	$operationParameterReturnTypeDefined = true;
+																}
+																$nodeIndex++;
 															}
 														}
 													}
@@ -3400,7 +3455,7 @@ class WsdlToPhpGenerator extends SoapClient
 	 */
 	private static function initGlobals()
 	{
-		$GLOBALS[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY] = array();
+		self::$globals[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY] = array();
 		return true;
 	}
 	/**
@@ -3410,8 +3465,8 @@ class WsdlToPhpGenerator extends SoapClient
 	 */
 	public static function unsetGlobals()
 	{
-		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,$GLOBALS))
-			unset($GLOBALS[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY]);
+		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,self::$globals))
+			unset(self::$globals[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY]);
 		return true;
 	}
 	/**
@@ -3425,8 +3480,8 @@ class WsdlToPhpGenerator extends SoapClient
 	{
 		if(!is_scalar($_globalKey))
 			return null;
-		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,$GLOBALS))
-			return ($GLOBALS[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY][$_globalKey] = $_globalValue);
+		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,self::$globals))
+			return (self::$globals[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY][$_globalKey] = $_globalValue);
 		else
 			return null;
 	}
@@ -3441,8 +3496,8 @@ class WsdlToPhpGenerator extends SoapClient
 	{
 		if(!is_scalar($_globalKey))
 			return $_globalFallback;
-		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,$GLOBALS) && array_key_exists($_globalKey,$GLOBALS[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY]))
-			return $GLOBALS[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY][$_globalKey];
+		if(array_key_exists(self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY,self::$globals) && array_key_exists($_globalKey,self::$globals[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY]))
+			return self::$globals[self::WSDL_TO_PHP_GENERATOR_GLOBAL_KEY][$_globalKey];
 		else
 			return $_globalFallback;
 	}
@@ -3451,6 +3506,7 @@ class WsdlToPhpGenerator extends SoapClient
 	 * @uses WsdlToPhpGenerator::WSDL_TO_PHP_GENERATOR_AUDIT_KEY
 	 * @uses WsdlToPhpGenerator::getGlobal()
 	 * @uses WsdlToPhpGenerator::setGlobal()
+	 * @uses WsdlToPhpGenerator::getOptionDebug()
 	 * @param string $_auditName the type of audit (parsing, generating, etc..). If audit name is parsing_DOM, than parsing is created to cumulate time for all parsing processes 
 	 * @param string $_auditElement audit specific element
 	 * @param int $_spentTime already spent time on the current audit category (and element)
@@ -3532,6 +3588,11 @@ class WsdlToPhpGenerator extends SoapClient
 		 * Update global audit
 		 */
 		self::setGlobal(self::WSDL_TO_PHP_GENERATOR_AUDIT_KEY,$audit);
+		/**
+		 * Display debug
+		 */
+		if(!$_createOnly && self::getOptionDebug())
+			echo "\r\n" . date('Y-m-d H:i:s') . " - {$_auditName} - {$_auditElement}";
 		return true;
 	}
 	/**
