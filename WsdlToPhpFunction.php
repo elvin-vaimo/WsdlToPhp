@@ -22,6 +22,11 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	 */
 	private $returnType = '';
 	/**
+	 * Indicates function is not alone with this name, then its name is contextualized based on its parameter(s)
+	 * @var bool
+	 */
+	private $isUnique = true;
+	/**
 	 * Main constructor
 	 * @see WsdlToPhpModel::__construct()
 	 * @uses WsdlToPhpFunction::setParameterType()
@@ -41,11 +46,38 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		$this->setOwner($_wsdlToPhpService);
 	}
 	/**
+	 * Returns the name of the method that is used to call the operation
+	 * It takes care of the fact that the method might not be the only one named as it is.
+	 * @uses WsdlToPhpModel::getCleanName()
+	 * @uses WsdlToPhpModel::replaceReservedPhpKeyword()
+	 * @uses WsdlToPhpModel::getOwner()
+	 * @uses WsdlToPhpModel::getPackagedName()
+	 * @uses WsdlToPhpModel::uniqueName()
+	 * @uses WsdlToPhpFunction::getOwner()
+	 * @uses WsdlToPhpFunction::getParameterType()
+	 * @uses WsdlToPhpFunction::getIsUnique()
+	 * @return string
+	 */
+	public function getMethodName()
+	{
+		$methodName = $this->getCleanName();
+		if(!$this->getIsUnique())
+		{
+			if(is_string($this->getParameterType()))
+				$methodName .= ucfirst($this->getParameterType());
+			else
+				$methodName .= '_' . md5(var_export($this->getParameterType(),true));
+		}
+		$methodName = self::replaceReservedPhpKeyword($methodName,$this->getOwner()->getPackagedName());
+		return self::uniqueName($methodName,$this->getOwner()->getPackagedName());
+	}
+	/**
 	 * Returns the comment lines for this function
 	 * @see WsdlToPhpModel::getComment()
 	 * @uses WsdlToPhpStructAttribute::getGetterName()
 	 * @uses WsdlToPhpFunction::getParameterType()
 	 * @uses WsdlToPhpFunction::getReturnType()
+	 * @uses WsdlToPhpFunction::getIsUnique()
 	 * @uses WsdlToPhpStruct::getAttributes()
 	 * @uses WsdlToPhpStruct::getIsStruct()
 	 * @uses WsdlToPhpStruct::getIsRestriction()
@@ -61,6 +93,8 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	{
 		$comments = array();
 		array_push($comments,'Method to call the operation originally named ' . $this->getName());
+		if(!$this->getIsUnique())
+			array_push($comments,'This method has been renamed because it is defined several times but with different signature');
 		if($this->getDocumentation() != '')
 			array_push($comments,'Documentation : ' . $this->getDocumentation());
 		$this->addMetaComment($comments,false,true);
@@ -78,15 +112,7 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		{
 			$model = self::getModelByName($this->getParameterType());
 			if($model && $model->getIsStruct() && !$model->getIsRestriction())
-			{
-				$attributes = $model->getAttributes(true,true);
-				if(count($attributes))
-				{
-					foreach($attributes as $attributeData)
-						array_push($comments,'@uses ' . $attributeData['model']->getPackagedName() . '::' . $attributeData['attribute']->getGetterName() . '()');
-					array_push($comments,'@param ' . $model->getPackagedName() . ' $_' . lcfirst($model->getPackagedName()));
-				}
-			}
+				array_push($comments,'@param ' . $model->getPackagedName() . ' $_' . lcfirst($model->getPackagedName()));
 			else
 				array_push($comments,'@param ' . $this->getParameterType() . ' $_' . lcfirst($this->getParameterType()));
 		}
@@ -117,13 +143,12 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 	 * @uses WsdlToPhpModel::getName()
 	 * @uses WsdlToPhpModel::getPackagedName()
 	 * @uses WsdlToPhpModel::getModelByName()
-	 * @uses WsdlToPhpModel::getCleanName()
 	 * @uses WsdlToPhpModel::nameIsClean()
 	 * @uses WsdlToPhpModel::cleanString()
 	 * @uses WsdlToPhpModel::uniqueName()
-	 * @uses WsdlToPhpModel::replaceReservedPhpKeyword()
 	 * @uses WsdlToPhpFunction::getParameterType()
 	 * @uses WsdlToPhpFunction::getOwner()
+	 * @uses WsdlToPhpFunction::getMethodName()
 	 * @uses WsdlToPhpStruct::getAttributes()
 	 * @uses WsdlToPhpStruct::getIsStruct()
 	 * @uses WsdlToPhpStructAttribute::getGetterName()
@@ -168,7 +193,7 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		}
 		else
 			$parameterName = $parameter = '';
-		array_push($_body,'public function ' . self::uniqueName(self::replaceReservedPhpKeyword($this->getCleanName(),$this->getOwner()->getPackagedName()),$this->getOwner()->getPackagedName()) . '(' . $parameter . ')');
+		array_push($_body,'public function ' . $this->getMethodName() . '(' . $parameter . ')');
 		array_push($_body,'{');
 		array_push($_body,'try');
 		array_push($_body,'{');
@@ -182,13 +207,10 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		 */
 		if($parameterModel)
 		{
-			$soapParametersEnd = array();
 			$attributes = $parameterModel->getAttributes(true,true);
 			if(count($attributes))
 			{
-				foreach($attributes as $attributeData)
-					array_push($soapParametersEnd,(WsdlToPhpGenerator::getOptionSendArrayAsParameter()?'\'' . addslashes($attributeData['attribute']->getName()) . '\'=>':'') . $parameterName . '->' . $attributeData['attribute']->getGetterName() . '()');
-				$soapParametersStart = implode(',',$soapParametersEnd);
+				$soapParametersStart = $parameterName;
 				$soapParametersEnd = '';
 			}
 			else
@@ -287,6 +309,23 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		return ($this->returnType = $_returnType);
 	}
 	/**
+	 * Returns the isUnique property
+	 * @return bool
+	 */
+	public function getIsUnique()
+	{
+		return $this->isUnique;
+	}
+	/**
+	 * Set the isUnique property
+	 * @param bool
+	 * @return string
+	 */
+	public function setIsUnique($_isUnique)
+	{
+		return ($this->isUnique = $_isUnique);
+	}
+	/**
 	 * Returns the owner model object, meaning a WsdlToPhpService object
 	 * @see WsdlToPhpModel::getOwner()
 	 * @uses WsdlToPhpModel::getOwner()
@@ -305,4 +344,3 @@ class WsdlToPhpFunction extends WsdlToPhpModel
 		return __CLASS__;
 	}
 }
-?>

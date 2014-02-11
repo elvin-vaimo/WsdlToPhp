@@ -16,15 +16,26 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 	 */
 	const WSDL_URL = 'wsdl_url';
 	/**
+	 * Constant to define the default WSDL URI
+	 * @var string
+	 */
+	const VALUE_WSDL_URL = 'wsdl_url_value';
+	/**
 	 * Option key to define WSDL login
 	 * @var string
 	 */
 	const WSDL_LOGIN = 'wsdl_login';
 	/**
 	 * Option key to define WSDL password
+	 * @deprecated use WSDL_PASSWORD instead
 	 * @var string
 	 */
 	const WSDL_PASSWD = 'wsdl_password';
+	/**
+	 * Option key to define WSDL password
+	 * @var string
+	 */
+	const WSDL_PASSWORD = 'wsdl_password';
 	/**
 	 * Option key to define WSDL trace option
 	 * @var string
@@ -32,9 +43,15 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 	const WSDL_TRACE = 'wsdl_trace';
 	/**
 	 * Option key to define WSDL exceptions
+	 * @deprecated use WSDL_EXCEPTIONS instead
 	 * @var string
 	 */
 	const WSDL_EXCPTS = 'wsdl_exceptions';
+	/**
+	 * Option key to define WSDL exceptions
+	 * @var string
+	 */
+	const WSDL_EXCEPTIONS = 'wsdl_exceptions';
 	/**
 	 * Option key to define WSDL cache_wsdl
 	 * @var string
@@ -84,7 +101,7 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 	 * Option key to define WSDL keep_alive
 	 * @var string
 	 */
-	const WSDL_FKEEP_ALIVE = 'wsdl_keep_alive';
+	const WSDL_KEEP_ALIVE = 'wsdl_keep_alive';
 	/**
 	 * Soapclient called to communicate with the actual SOAP Service
 	 * @var SoapClient
@@ -223,15 +240,16 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 	 * @uses PackageNameWsdlClass::WSDL_COMPRESSION
 	 * @uses PackageNameWsdlClass::WSDL_CONNECTION_TIMEOUT
 	 * @uses PackageNameWsdlClass::WSDL_ENCODING
-	 * @uses PackageNameWsdlClass::WSDL_EXCPTS
+	 * @uses PackageNameWsdlClass::WSDL_EXCEPTIONS
 	 * @uses PackageNameWsdlClass::WSDL_FEATURES
 	 * @uses PackageNameWsdlClass::WSDL_LOGIN
-	 * @uses PackageNameWsdlClass::WSDL_PASSWD
+	 * @uses PackageNameWsdlClass::WSDL_PASSWORD
 	 * @uses PackageNameWsdlClass::WSDL_SOAP_VERSION
 	 * @uses PackageNameWsdlClass::WSDL_STREAM_CONTEXT
 	 * @uses PackageNameWsdlClass::WSDL_TRACE
 	 * @uses PackageNameWsdlClass::WSDL_TYPEMAP
 	 * @uses PackageNameWsdlClass::WSDL_URL
+	 * @uses PackageNameWsdlClass::VALUE_WSDL_URL
 	 * @uses PackageNameWsdlClass::WSDL_USER_AGENT
 	 * @uses SOAP_SINGLE_ELEMENT_ARRAYS
 	 * @uses SOAP_USE_XSI_ARRAY_TYPE
@@ -244,15 +262,15 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 					self::WSDL_COMPRESSION=>null,
 					self::WSDL_CONNECTION_TIMEOUT=>null,
 					self::WSDL_ENCODING=>null,
-					self::WSDL_EXCPTS=>true,
+					self::WSDL_EXCEPTIONS=>true,
 					self::WSDL_FEATURES=>SOAP_SINGLE_ELEMENT_ARRAYS | SOAP_USE_XSI_ARRAY_TYPE,
 					self::WSDL_LOGIN=>null,
-					self::WSDL_PASSWD=>null,
+					self::WSDL_PASSWORD=>null,
 					self::WSDL_SOAP_VERSION=>null,
 					self::WSDL_STREAM_CONTEXT=>null,
 					self::WSDL_TRACE=>true,
 					self::WSDL_TYPEMAP=>null,
-					self::WSDL_URL=>null,
+					self::WSDL_URL=>self::VALUE_WSDL_URL,
 					self::WSDL_USER_AGENT=>null);
 	}
 	/**
@@ -415,7 +433,7 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 	 */
 	public function setHttpHeader($_headerName,$_headerValue)
 	{
-		if(self::getSoapClient())
+		if(self::getSoapClient() && !empty($_headerName))
 		{
 			$streamContext = (isset(self::getSoapClient()->_stream_context) && is_resource(self::getSoapClient()->_stream_context))?self::getSoapClient()->_stream_context:null;
 			if(!is_resource($streamContext))
@@ -453,7 +471,7 @@ class PackageNameWsdlClass extends stdClass implements ArrayAccess,Iterator,Coun
 				$newLines = array();
 				foreach($lines as $line)
 				{
-					if(strpos($line,$_headerName) === false)
+					if(!empty($line) && strpos($line,$_headerName) === false)
 						array_push($newLines,$line);
 				}
 				/**
