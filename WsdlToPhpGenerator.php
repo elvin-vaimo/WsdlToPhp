@@ -625,6 +625,7 @@ class WsdlToPhpGenerator extends SoapClient
 	/**
 	 * Generates all classes based on options
 	 * @uses WsdlToPhpGenerator::setPackageName()
+	 * @uses WsdlToPhpGenerator::getWsdl()
 	 * @uses WsdlToPhpGenerator::getStructs()
 	 * @uses WsdlToPhpGenerator::initStructs()
 	 * @uses WsdlToPhpGenerator::getServices()
@@ -652,7 +653,7 @@ class WsdlToPhpGenerator extends SoapClient
 	public function generateClasses($_packageName,$_rootDirectory,$_rootDirectoryRights = 0775,$_createRootDirectory = true)
 	{
 		self::initGlobals();
-		$wsdl = implode('',array_slice(array_keys($this->wsdls),0,1));
+		$wsdl = $this->getWsdl(0);
 		self::auditInit('generate_classes',$wsdl);
 		self::setPackageName($_packageName);
 		$rootDirectory = $_rootDirectory . (substr($_rootDirectory,-1) != '/'?'/':'');
@@ -881,7 +882,7 @@ class WsdlToPhpGenerator extends SoapClient
 			 * Ordering structs in order to generate mother class first and to put them on top in the autoload file
 			 */
 			$structsToGenerateDone = array();
-			foreach($structs as $index=>$struct)
+			foreach($structs as $struct)
 			{
 				if(!array_key_exists($struct->getName(),$structsToGenerateDone))
 					$structsToGenerateDone[$struct->getName()] = 0;
@@ -901,7 +902,7 @@ class WsdlToPhpGenerator extends SoapClient
 			arsort($structsToGenerateDone);
 			$structTmp = $structs;
 			$structs = array();
-			foreach($structsToGenerateDone as $structName=>$structPriority)
+			foreach(array_keys($structsToGenerateDone) as $structName)
 				$structs[$structName] = $structTmp[$structName];
 			unset($structTmp,$structsToGenerateDone);
 			foreach($structs as $structName=>$struct)
@@ -1027,7 +1028,7 @@ class WsdlToPhpGenerator extends SoapClient
 		$servicesClassesFiles = array();
 		if(count($services))
 		{
-			foreach($services as $serviceName=>$service)
+			foreach($services as $service)
 			{
 				$elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights,$service);
 				array_push($servicesClassesFiles,$serviceClassFileName = $elementFolder . $service->getPackagedName() . '.php');
@@ -1059,12 +1060,12 @@ class WsdlToPhpGenerator extends SoapClient
 						'<?php');
 		$indentationString = "\t";
 		$indentationLevel = 0;
-		foreach($_declarations as $line=>$declaration)
+		foreach($_declarations as $declaration)
 		{
 			if(is_array($declaration) && array_key_exists('comment',$declaration) && is_array($declaration['comment']))
 			{
 				array_push($content,str_repeat($indentationString,$indentationLevel) . '/**');
-				foreach($declaration['comment'] as $subLine=>$subComment)
+				foreach($declaration['comment'] as $subComment)
 					array_push($content,str_repeat($indentationString,$indentationLevel) . ' * ' . WsdlToPhpModel::cleanComment($subComment));
 				array_push($content,str_repeat($indentationString,$indentationLevel) . ' */');
 			}
@@ -1151,7 +1152,7 @@ class WsdlToPhpGenerator extends SoapClient
 		array_push($classMapDeclaration,'{');
 		$structs = $this->getStructs();
 		$classesToMap = array();
-		foreach($structs as $structName=>$struct)
+		foreach($structs as $struct)
 		{
 			if($struct->getIsStruct())
 				$classesToMap[$struct->getName()] = $struct->getPackagedName();
@@ -1255,7 +1256,7 @@ class WsdlToPhpGenerator extends SoapClient
 			else
 				$content = file_get_contents(dirname(__FILE__) . '/WsdlClassFileTpl.php');
 			$metaInformation = '';
-			foreach($this->wsdls as $wsdlLocation=>$wsdlinfos)
+			foreach($this->wsdls as $wsdlinfos)
 			{
 				foreach($wsdlinfos['meta'] as $metaName=>$metaValue)
 				{
@@ -1268,10 +1269,12 @@ class WsdlToPhpGenerator extends SoapClient
 			$content = str_replace(array(
 										'packageName',
 										'PackageName',
-										'meta_informations'),array(
+										'meta_informations',
+										"'wsdl_url_value'"),array(
 																lcfirst(self::getPackageName(false)),
 																self::getPackageName(),
-																$metaInformation),$content);
+																$metaInformation,
+																var_export(self::getWsdl(0),true)),$content);
 			file_put_contents($_rootDirectory . self::getPackageName() . 'WsdlClass.php',$content);
 			self::audit('generate_wsdlclass');
 			return array(
@@ -1284,6 +1287,7 @@ class WsdlToPhpGenerator extends SoapClient
 	 * Generates tutorial file
 	 * @uses WsdlToPhpGenerator::getOptionGenerateAutoloadFile()
 	 * @uses WsdlToPhpGenerator::getWsdls()
+	 * @uses WsdlToPhpGenerator::getWsdl()
 	 * @uses WsdlToPhpGenerator::getPackageName()
 	 * @uses WsdlToPhpGenerator::auditInit()
 	 * @uses WsdlToPhpGenerator::audit()
@@ -1322,7 +1326,7 @@ class WsdlToPhpGenerator extends SoapClient
 					{
 						$classNameVar = lcfirst($className);
 						$content .= "\r\n\r\n/**" . str_repeat('*',strlen("Example for $className")) . "\r\n * Example for $className\r\n */";
-						$content .= "\r\n\$$classNameVar = new $className(\$wsdl);";
+						$content .= "\r\n\$$classNameVar = new $className();";
 						foreach($classMethods as $classMethod)
 						{
 							$content .= "\r\n// sample call for $className::" . $classMethod->getName() . '()';
@@ -1404,7 +1408,7 @@ class WsdlToPhpGenerator extends SoapClient
 																lcfirst(self::getPackageName()),
 																ucfirst(self::getPackageName()),
 																strtoupper(self::getPackageName()),
-																implode('',array_slice(array_keys($this->getWsdls()),0,1)),
+																var_export($this->getWsdl(0),true),
 																$content),$fileContent);
 				file_put_contents($_rootDirectory . 'sample-' . strtolower(self::getPackageName()) . '.php',$fileContent);
 			}
@@ -1598,21 +1602,6 @@ class WsdlToPhpGenerator extends SoapClient
 		}
 	}
 	/**
-	 * Adds an info to the struct value
-	 * @uses WsdlToPhpGenerator::getStructValue()
-	 * @uses WsdlToPhpModel::addMeta()
-	 * @param string $_structName the original struct name
-	 * @param string $_valueName the value name
-	 * @param string $_valueInfoName the value info name
-	 * @param mixed $_valueInfoValue the value info value
-	 * @return void
-	 */
-	private function addStructValueMeta($_structName,$_valueName,$_valueInfoName,$_valueInfoValue)
-	{
-		if($this->getStructValue($_structName,$_valueName))
-			$this->getStructValue($_structName,$_valueName)->addMeta($_valueInfoName,$_valueInfoValue);
-	}
-	/**
 	 * Adds struct value documentation info
 	 * @uses WsdlToPhpGenerator::getStructValue()
 	 * @uses WsdlToPhpModel::setDocumentation()
@@ -1625,21 +1614,6 @@ class WsdlToPhpGenerator extends SoapClient
 	{
 		if($this->getStructValue($_structName,$_valueName))
 			$this->getStructValue($_structName,$_valueName)->setDocumentation($_documentation);
-	}
-	/**
-	 * Adds a restrcition struct
-	 * @uses WsdlToPhpGenerator::getStruct()
-	 * @uses WsdlToPhpStruct::setIsRestriction()
-	 * @param string $_structName the original struct name
-	 * @return void
-	 */
-	private function addRestrictionStruct($_structName)
-	{
-		if($this->getStruct($_structName) === null)
-		{
-			$this->structs[$_structName] = new WsdlToPhpStruct($_structName);
-			$this->getStruct($_structName)->setIsRestriction(true);
-		}
 	}
 	/**
 	 * Adds a virtual struct
@@ -1675,6 +1649,7 @@ class WsdlToPhpGenerator extends SoapClient
 	 * @uses WsdlToPhpGenerator::getService()
 	 * @uses WsdlToPhpGenerator::getServiceFunction()
 	 * @uses WsdlToPhpService::addFunction()
+	 * @uses WsdlToPhpFunction::setIsUnique()
 	 * @param string $_functionName the original function name
 	 * @param string $_functionParameter the original parameter name
 	 * @param string $_functionReturn the original return name
@@ -1685,8 +1660,20 @@ class WsdlToPhpGenerator extends SoapClient
 		$serviceName = $this->getServiceName($_functionName);
 		if(!$this->getService($serviceName))
 			$this->services[$serviceName] = new WsdlToPhpService($serviceName);
-		if(!$this->getServiceFunction($_functionName))
+		$serviceFunction = $this->getServiceFunction($_functionName);
+		/**
+		 * Service function does not already exist, register it
+		 */
+		if(!$serviceFunction)
 			$this->getService($serviceName)->addFunction($_functionName,$_functionParameter,$_functionReturn);
+		/**
+		 * Service function exists with a different signature, register it too by identifying the service functions as non unique functions
+		 */
+		elseif($serviceFunction->getParameterType() != $_functionParameter)
+		{
+			$serviceFunction->setIsUnique(false);
+			$this->getService($serviceName)->addFunction($_functionName,$_functionParameter,$_functionReturn,false);
+		}
 	}
 	/**
 	 * Gets a service by its name
@@ -1698,38 +1685,12 @@ class WsdlToPhpGenerator extends SoapClient
 		return array_key_exists($_serviceName,$this->getServices())?$this->services[$_serviceName]:null;
 	}
 	/**
-	 * Adds info value to an existing service
-	 * @uses WsdlToPhpGenerator::getService()
-	 * @uses WsdlToPhpModel::addMeta()
-	 * @param string $_serviceName the service name
-	 * @param string $_functionInfoName the function name
-	 * @param mixed $_functionInfoValue the function info value
-	 * @return void
-	 */
-	private function addServiceMeta($_serviceName,$_functionInfoName,$_functionInfoValue)
-	{
-		if($this->getService($_serviceName))
-			$this->getService($_serviceName)->addMeta($_functionInfoName,$_functionInfoValue);
-	}
-	/**
-	 * Adds documentation to an existing function
-	 * @uses WsdlToPhpGenerator::getService()
-	 * @uses WsdlToPhpModel::setDocumentation()
-	 * @param string $_functionName the function name
-	 * @param string $_documentation the documentation value
-	 * @return void
-	 */
-	private function setServiceDocumentation($_functionName,$_documentation)
-	{
-		if($this->getService($_functionName))
-			$this->getService($_functionName)->setDocumentation($_documentation);
-	}
-	/**
 	 * Returns the function
 	 * @uses WsdlToPhpGenerator::getServiceName()
 	 * @uses WsdlToPhpGenerator::getService()
 	 * @uses WsdlToPhpService::getFunction()
 	 * @param string $_functionName the original function name
+	 * @param mixed $_functionParameter the original function paramter
 	 * @return WsdlToPhpFunction|null
 	 */
 	private function getServiceFunction($_functionName)
@@ -2052,6 +2013,15 @@ class WsdlToPhpGenerator extends SoapClient
 		return $this->wsdls;
 	}
 	/**
+	 * Gets the WSDL at the index
+	 * @param int $_index
+	 * @return string|null
+	 */
+	public function getWsdl($_index)
+	{
+		return (is_array($this->wsdls) && count($this->wsdls) > $_index)?implode('',array_slice(array_keys($this->wsdls),$_index,1)):null;
+	}
+	/**
 	 * Sets the WSDLs
 	 * @param array
 	 * @return array
@@ -2072,14 +2042,14 @@ class WsdlToPhpGenerator extends SoapClient
 	}
 	/**
 	 * Adds Wsdl location meta information
-	 * @uses WsdlToPhpGenerator::getWsdls()
+	 * @uses WsdlToPhpGenerator::getWsdl()
 	 * @param string $_metaName meta name
 	 * @param mixed $_metaValue meta value
 	 * @return string
 	 */
 	public function addWsdlMeta($_metaName,$_metaValue)
 	{
-		return ($this->wsdls[implode('',array_slice(array_keys($this->wsdls),0,1))]['meta'][$_metaName] = $_metaValue);
+		return ($this->wsdls[$this->getWsdl(0)]['meta'][$_metaName] = $_metaValue);
 	}
 	/**
 	 * Methods to load WSDL from current WSDL when current WSDL imports other WSDL
@@ -2145,7 +2115,7 @@ class WsdlToPhpGenerator extends SoapClient
 			array_push($tags,'output');
 			foreach($tags as $tagName)
 			{
-				foreach($this->getWsdls() as $wsdlLocation=>$wsdlData)
+				foreach(array_keys($this->getWsdls()) as $wsdlLocation)
 				{
 					if(is_string($wsdlLocation) && !empty($wsdlLocation))
 						$this->manageWsdlLocation($wsdlLocation,null,'',$tagName);
@@ -2653,11 +2623,11 @@ class WsdlToPhpGenerator extends SoapClient
 	 * @uses WsdlToPhpGenerator::getGlobal()
 	 * @uses WsdlToPhpGenerator::setGlobal()
 	 * @uses WsdlToPhpGenerator::getServiceFunction()
+	 * @uses WsdlToPhpGenerator::executeDomXPathQuery()
 	 * @uses WsdlToPhpModel::getPackagedName()
 	 * @uses WsdlToPhpModel::getMetaValue()
 	 * @uses DOMElement::getAttribute()
 	 * @uses DOMElement::hasAttribute()
-	 * @uses DOMXPath::query()
 	 * @uses DOMNodeList::item()
 	 * @param string $_wsdlLocation the wsdl location
 	 * @param DOMNode $_domNode the node
@@ -2723,11 +2693,10 @@ class WsdlToPhpGenerator extends SoapClient
 							$domDocument = self::wsdlLocationToDomDocument($wsdlLocation);
 							if($domDocument instanceof DOMDocument)
 							{
-								$domXPath = new DOMXPath($domDocument);
 								/**
 								 * Gets part element
 								 */
-								$nodes = $domXPath->query("//*[@name='$headerMessage']/*[@name='$headerName']");
+								$nodes = self::executeDomXPathQuery($domDocument,"//*[@name='$headerMessage']/*[@name='$headerName']");
 								$nodesLength = $nodes->length;
 								if($nodesLength == 1 && ($nodes->item(0) instanceof DOMNode) && stripos($nodes->item(0)->nodeName,'part') !== false)
 								{
@@ -2771,8 +2740,7 @@ class WsdlToPhpGenerator extends SoapClient
 												/**
 												 * Header type value
 												 */
-												$domXPath = new DOMXPath($domDocument);
-												$nodes = $domXPath->query("//*[@name='$partElement']");
+												$nodes = self::executeDomXPathQuery($domDocument,"//*[@name='$partElement']");
 												$nodesLength = $nodes->length;
 												$nodeIndex = 0;
 												while($nodeIndex < $nodesLength && (!($nodes->item($nodeIndex) instanceof DOMElement) || (($nodes->item($nodeIndex) instanceof DOMElement) && (!$nodes->item($nodeIndex)->hasAttribute('type') || ($nodes->item($nodeIndex)->hasAttribute('type') && $nodes->item($nodeIndex)->getAttribute('type') === '')))) && $nodeIndex++);
@@ -3036,11 +3004,11 @@ class WsdlToPhpGenerator extends SoapClient
 	 * Manages input/output node
 	 * @uses WsdlToPhpGenerator::findSuitableParent()
 	 * @uses WsdlToPhpGenerator::getServiceFunction()
+	 * @uses WsdlToPhpGenerator::executeDomXPathQuery()
 	 * @uses DOMNode::hasAttributes()
 	 * @uses DOMNodeList::item()
 	 * @uses DOMElement::getAttribute()
 	 * @uses DOMElement::hasAttribute()
-	 * @uses DOMXPath::query()
 	 * @uses WsdlToPhpFunction::getParameterType()
 	 * @uses WsdlToPhpFunction::setParameterType()
 	 * @uses WsdlToPhpFunction::getReturnType()
@@ -3091,8 +3059,7 @@ class WsdlToPhpGenerator extends SoapClient
 							$domDocument = self::wsdlLocationToDomDocument($wsdlLocation);
 							if($domDocument instanceof DOMDocument)
 							{
-								$domXPath = new DOMXPath($domDocument);
-								$nodes = $domXPath->query("//*[@name='$messageName']");
+								$nodes = self::executeDomXPathQuery($domDocument,"//*[@name='$messageName']");
 								$nodesLength = $nodes->length;
 								$nodeIndex = 0;
 								while($nodeIndex < $nodesLength && (!($nodes->item($nodeIndex) instanceof DOMElement) || (($nodes->item($nodeIndex) instanceof DOMElement) && stripos($nodes->item($nodeIndex)->nodeName,'message') === false)) && $nodeIndex++);
@@ -3132,8 +3099,7 @@ class WsdlToPhpGenerator extends SoapClient
 													$domDocument = self::wsdlLocationToDomDocument($wsdlLocation);
 													if($domDocument instanceof DOMDocument)
 													{
-														$domXPath = new DOMXPath($domDocument);
-														$nodes = $domXPath->query("//*[@name='$partElement']");
+														$nodes = self::executeDomXPathQuery($domDocument,"//*[@name='$partElement']");
 														$nodesLength = $nodes->length;
 														$nodeIndex = 0;
 														while($nodeIndex < $nodesLength && (!($nodes->item($nodeIndex) instanceof DOMElement) || (($nodes->item($nodeIndex) instanceof DOMElement) && (!$nodes->item($nodeIndex)->hasAttribute('type') || ($nodes->item($nodeIndex)->hasAttribute('type') && $nodes->item($nodeIndex)->getAttribute('type') === '')))) && $nodeIndex++);
@@ -3225,6 +3191,18 @@ class WsdlToPhpGenerator extends SoapClient
 			$parentNode = $parentNode->parentNode;
 		self::audit(__METHOD__,$_domNode->nodeName);
 		return ($parentNode instanceof DOMElement)?$parentNode:null;
+	}
+	/**
+	 * Execute query on DOMDocument using DOMXPath
+	 * @uses DOMXPath::query()
+	 * @param DOMDocument $_domDocument the DOMDocument to execute the query on
+	 * @param string $_query the query to execute
+	 * @return DOMNodeList the results
+	 */
+	public static function executeDomXPathQuery(DOMDocument $_domDocument,$_query)
+	{
+		$domXPath = new DOMXPath($_domDocument);
+		return $domXPath->query($_query);
 	}
 	/**
 	 * Returns the DOMDocument object for a wsdl location
@@ -3625,4 +3603,3 @@ class WsdlToPhpGenerator extends SoapClient
 		return __CLASS__;
 	}
 }
-?>
