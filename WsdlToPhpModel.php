@@ -162,8 +162,20 @@ class WsdlToPhpModel
         /**
          * Class comments
          */
+        if (WsdlToPhpGenerator::getPhpDocCopyright()) {
+            $comments = array();
+            foreach(WsdlToPhpGenerator::getPhpDocCopyright() as $commentRow) {
+                array_push($comments, $commentRow);
+            }
+            if (!empty($comments)) {
+                array_push($class,array(
+                        'comment' => $comments));
+            }
+        }
+        /*
         array_push($class,array(
                                 'comment'=>$this->getFileComment()));
+        */
         array_push($class,array(
                                 'comment'=>$this->getClassComment()));
         /**
@@ -458,7 +470,7 @@ class WsdlToPhpModel
      */
     public function getPackagedName()
     {
-        return WsdlToPhpGenerator::getPackageName() . $this->getContextualPart() . ucfirst(self::uniqueName($this->getCleanName(),$this->getContextualPart()));
+        return WsdlToPhpGenerator::getPackageName() . $this->getContextualPart() . '_' . ucfirst(self::uniqueName($this->getCleanName(),$this->getContextualPart()));
     }
     /**
      * Allows to define the contextual part of the class name for the package
