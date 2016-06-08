@@ -511,6 +511,9 @@ class WsdlToPhpGenerator extends SoapClient
      * @var array
      */
     private static $optionAddComments;
+
+    private static $optionZendDirectory;
+
     /**
      * Option to set debug
      * @var bool
@@ -908,8 +911,9 @@ class WsdlToPhpGenerator extends SoapClient
             {
                 if(!$struct->getIsStruct())
                     continue;
-                $elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights,$struct);
-                array_push($structsClassesFiles,$structClassFileName = $elementFolder . $struct->getPackagedName() . '.php');
+
+                $structClassFileName = $this->getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $struct) . '.php';
+                array_push($structsClassesFiles,$structClassFileName);
                 /**
                  * Generates file
                  */
@@ -1028,8 +1032,7 @@ class WsdlToPhpGenerator extends SoapClient
         {
             foreach($services as $service)
             {
-                $elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights,$service);
-                array_push($servicesClassesFiles,$serviceClassFileName = $elementFolder . $service->getPackagedName() . '.php');
+                array_push($servicesClassesFiles,$serviceClassFileName = $this->getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $service) . '.php');
                 /**
                  * Generates file
                  */
@@ -1039,6 +1042,24 @@ class WsdlToPhpGenerator extends SoapClient
         self::audit('generate_services');
         return $servicesClassesFiles;
     }
+
+    protected function getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $model)
+    {
+	 	if (!self::getOptionZendDirectory()) {
+			$elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights, $model);
+			return $elementFolder . $model->getPackagedName();
+	 	}
+
+		$className = $model->getPackagedName();
+		$folders = explode('_', $className);
+		$className = array_pop($folders);
+
+		$elementFolder = $_rootDirectory .  implode('/', $folders) . '/';
+		@mkdir($elementFolder, 0777, true);
+
+		return $elementFolder . $className;
+    }
+
     /**
      * Populate the php file with the object and the declarations
      * @uses WsdlToPhpModel::cleanComment()
@@ -1749,6 +1770,15 @@ class WsdlToPhpGenerator extends SoapClient
             return false;
         }
     }
+    public static function setOptionZendDirectory($bool = true)
+    {
+		self::$optionZendDirectory = (bool )$bool;
+    }
+    public static function getOptionZendDirectory()
+    {
+		return self::$optionZendDirectory;
+    }
+
     /**
      * Sets the optionSubCategory value
      * @return int
@@ -3265,6 +3295,7 @@ class WsdlToPhpGenerator extends SoapClient
             if(!is_dir($directory))
                 @mkdir($directory,$_rootDirectoryRights);
         }
+
         return $directory;
     }
     /**
@@ -3354,6 +3385,7 @@ class WsdlToPhpGenerator extends SoapClient
                 $optionValue = self::getOptionGatherMethods();
                 break;
         }
+
         if(!empty($string))
         {
             switch($optionValue)
