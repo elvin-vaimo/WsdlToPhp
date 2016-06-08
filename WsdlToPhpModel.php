@@ -458,7 +458,15 @@ class WsdlToPhpModel
      */
     public function getPackagedName()
     {
-        return WsdlToPhpGenerator::getPackageName() . $this->getContextualPart() . ucfirst(self::uniqueName($this->getCleanName(),$this->getContextualPart()));
+        $_name = ucfirst(self::uniqueName($this->getCleanName(),$this->getContextualPart()));
+        if (! $this instanceof WsdlToPhpFunction) {
+            // Make sure classes are in proper-case
+            $_nameParts = explode('_', $_name);
+            $_nameParts = array_map('ucfirst', $_nameParts);
+            $_name = implode('_', $_nameParts);
+        }
+
+        return WsdlToPhpGenerator::getPackageName() . $this->getContextualPart() . '_' . $_name;
     }
     /**
      * Allows to define the contextual part of the class name for the package
