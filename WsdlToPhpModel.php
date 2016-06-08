@@ -162,8 +162,20 @@ class WsdlToPhpModel
         /**
          * Class comments
          */
+        if (WsdlToPhpGenerator::getPhpDocCopyright()) {
+            $comments = array();
+            foreach(WsdlToPhpGenerator::getPhpDocCopyright() as $commentRow) {
+                array_push($comments, $commentRow);
+            }
+            if (!empty($comments)) {
+                array_push($class,array(
+                        'comment' => $comments));
+            }
+        }
+        /*
         array_push($class,array(
                                 'comment'=>$this->getFileComment()));
+        */
         array_push($class,array(
                                 'comment'=>$this->getClassComment()));
         /**

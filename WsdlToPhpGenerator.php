@@ -511,14 +511,24 @@ class WsdlToPhpGenerator extends SoapClient
      * @var array
      */
     private static $optionAddComments;
-
-    private static $optionZendDirectory;
-
     /**
      * Option to set debug
      * @var bool
      */
     private static $optionDebug;
+
+    /**
+     * Option to enable directory structure accordingly Zend-rules
+     * @var bool
+     */
+    private static $optionZendDirectory;
+
+    /**
+     * phpDoc for Copyright holder
+     * @var array
+     */
+    private static $optionPhpDocCopyright;
+
     /**
      * Use intern global variable instead of using the PHP $GLOBALS variable
      * @var array
@@ -911,7 +921,6 @@ class WsdlToPhpGenerator extends SoapClient
             {
                 if(!$struct->getIsStruct())
                     continue;
-
                 $structClassFileName = $this->getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $struct) . '.php';
                 array_push($structsClassesFiles,$structClassFileName);
                 /**
@@ -923,6 +932,7 @@ class WsdlToPhpGenerator extends SoapClient
         self::audit('generate_structs');
         return $structsClassesFiles;
     }
+
     /**
      * Initialize functions :
      * - Get structs defined
@@ -1043,21 +1053,27 @@ class WsdlToPhpGenerator extends SoapClient
         return $servicesClassesFiles;
     }
 
-    protected function getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $model)
+    /**
+     * @param $_rootDirectory
+     * @param $_rootDirectoryRights
+     * @param $model
+     * @return string
+     */
+    private function getZendRuleClassFolder($_rootDirectory,$_rootDirectoryRights, $model)
     {
-	 	if (!self::getOptionZendDirectory()) {
-			$elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights, $model);
-			return $elementFolder . $model->getPackagedName();
-	 	}
+        if (!self::getOptionZendDirectory()) {
+            $elementFolder = $this->getDirectory($_rootDirectory,$_rootDirectoryRights, $model);
+            return $elementFolder . $model->getPackagedName();
+        }
 
-		$className = $model->getPackagedName();
-		$folders = explode('_', $className);
-		$className = array_pop($folders);
+        $className = $model->getPackagedName();
+        $folders = explode('_', $className);
+        $className = array_pop($folders);
 
-		$elementFolder = $_rootDirectory .  implode('/', $folders) . '/';
-		@mkdir($elementFolder, 0777, true);
+        $elementFolder = $_rootDirectory .  implode('/', $folders) . '/';
+        @mkdir($elementFolder, 0777, true);
 
-		return $elementFolder . $className;
+        return $elementFolder . $className;
     }
 
     /**
@@ -1187,7 +1203,7 @@ class WsdlToPhpGenerator extends SoapClient
                     $filename);
     }
     /**
-     * Generates autoload file for all classes. 
+     * Generates autoload file for all classes.
      * The classes are loaded automatically in order of their dependency regarding their inheritance (defined in WsdlToPhpGenerate::generateStructsClasses() method).
      * @uses WsdlToPhpGenerator::getPackageName()
      * @uses WsdlToPhpGenerator::getOptionAddComments()
@@ -1770,13 +1786,45 @@ class WsdlToPhpGenerator extends SoapClient
             return false;
         }
     }
+
+    /**
+     * Sets the optionZendDirectory value
+     * @param bool $bool
+     * @return bool
+     */
     public static function setOptionZendDirectory($bool = true)
     {
-		self::$optionZendDirectory = (bool )$bool;
+        self::$optionZendDirectory = (bool )$bool;
+        return true;
     }
+
+    /**
+     * Gets the optionZendDirectory value
+     * @return bool
+     */
     public static function getOptionZendDirectory()
     {
-		return self::$optionZendDirectory;
+        return self::$optionZendDirectory;
+    }
+
+    /**
+     * Sets the optionPhpDocCopyright value
+     * @param array $comments
+     * @return bool
+     */
+    public static function setPhpDocCopyright(array $comments)
+    {
+        self::$optionPhpDocCopyright = $comments;
+        return true;
+    }
+
+    /**
+     * Gets the optionPhpDocCopyright value
+     * @return array
+     */
+    public static function getPhpDocCopyright()
+    {
+        return self::$optionPhpDocCopyright;
     }
 
     /**
@@ -2131,11 +2179,11 @@ class WsdlToPhpGenerator extends SoapClient
              */
             array_push($tags,'attribute');
             /**
-             * Retrieve operation message types in order to fully determine themselves  
+             * Retrieve operation message types in order to fully determine themselves
              */
             array_push($tags,'input');
             /**
-             * Retrieve operation message types in order to fully determine themselves  
+             * Retrieve operation message types in order to fully determine themselves
              */
             array_push($tags,'output');
             foreach($tags as $tagName)
@@ -3295,7 +3343,6 @@ class WsdlToPhpGenerator extends SoapClient
             if(!is_dir($directory))
                 @mkdir($directory,$_rootDirectoryRights);
         }
-
         return $directory;
     }
     /**
@@ -3385,7 +3432,6 @@ class WsdlToPhpGenerator extends SoapClient
                 $optionValue = self::getOptionGatherMethods();
                 break;
         }
-
         if(!empty($string))
         {
             switch($optionValue)
@@ -3512,7 +3558,7 @@ class WsdlToPhpGenerator extends SoapClient
      * @uses WsdlToPhpGenerator::getGlobal()
      * @uses WsdlToPhpGenerator::setGlobal()
      * @uses WsdlToPhpGenerator::getOptionDebug()
-     * @param string $_auditName the type of audit (parsing, generating, etc..). If audit name is parsing_DOM, than parsing is created to cumulate time for all parsing processes 
+     * @param string $_auditName the type of audit (parsing, generating, etc..). If audit name is parsing_DOM, than parsing is created to cumulate time for all parsing processes
      * @param string $_auditElement audit specific element
      * @param int $_spentTime already spent time on the current audit category (and element)
      * @param bool $_createOnly indicates if the element must be only created or not
@@ -3603,7 +3649,7 @@ class WsdlToPhpGenerator extends SoapClient
     /**
      * Method to initialize audit for an element
      * @uses WsdlToPhpGenerator::audit()
-     * @param string $_auditName the type of audit (parsing, generating, etc..). If audit name is parsing_DOM, than parsing is created to cumulate time for all parsing processes 
+     * @param string $_auditName the type of audit (parsing, generating, etc..). If audit name is parsing_DOM, than parsing is created to cumulate time for all parsing processes
      * @param string $_auditElement audit specific element
      * @return bool true
      */
